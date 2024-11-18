@@ -10,19 +10,14 @@
               <img
                 :src="
                   'https://www.gravatar.com/avatar/' +
-                  encodeURIComponent(message.user + Math.random()) +
+                  encodeURIComponent(message.emailHash) +
                   '?s=512&d=monsterid'
                 "
                 alt="Avatar"
                 class="w-8 h-8 rounded-full"
               />
               <div class="ml-2 bg-gray-800 rounded-lg p-2">
-                <p
-                  v-if="message.formattedText"
-                  class="overflow-x-scroll"
-                  v-html="message.formattedText"
-                ></p>
-                <p v-else class="text-white">{{ message.text }}</p>
+                <p class="text-white">{{ message.text }}</p>
               </div>
             </div>
             <p class="text-gray-500 mt-1 text-xs ml-10">{{ message.date }}</p>
@@ -50,24 +45,6 @@
           >
             Send
           </button>
-          <button
-            class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4"
-            @click="ping"
-          >
-            Ping
-          </button>
-          <button
-            class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4"
-            @click="connect"
-          >
-            Reconnect
-          </button>
-          <button
-            class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-r-lg"
-            @click="clear"
-          >
-            Clear
-          </button>
         </div>
       </div>
     </main>
@@ -80,7 +57,20 @@ let ws;
 const store = reactive({
   message: "",
   messages: [],
+  username: "anonymous",
+  emailHash: "",
 });
+
+async function hashEmail(email) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(email);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hash));
+  const hashHex = hashArray
+    .map((x) => x.toString(16).padStart(2, "0"))
+    .join("");
+  return hashHex;
+}
 
 const scroll = () => {
   nextTick(() => {
@@ -97,59 +87,44 @@ const scroll = () => {
   });
 };
 
-const format = async () => {
-  for (const message of store.messages) {
-    if (!message._fmt && message.text.startsWith("{")) {
-      message._fmt = true;
-      const { codeToHtml } = await import("https://esm.sh/shiki@1.0.0");
-      const str = JSON.stringify(JSON.parse(message.text), null, 2);
-      message.formattedText = await codeToHtml(str, {
-        lang: "json",
-        theme: "dark-plus",
-      });
-    }
-  }
-};
-
-const log = (user, ...args) => {
-  console.log("[ws]", user, ...args);
+const log = (user, hashedEmail, ...args) => {
   store.messages.push({
     text: args.join(" "),
-    formattedText: "",
     user: user,
+    emailHash: hashedEmail,
     date: new Date().toLocaleString(),
   });
   scroll();
-  format();
 };
 
 const connect = async () => {
   const isSecure = location.protocol === "https:";
-  const url = (isSecure ? "wss://" : "ws://") + location.host + "/_ws";
+  const url =
+    (isSecure ? "wss://" : "ws://") +
+    location.host +
+    "/_ws" +
+    `?username=${store.username}`;
   if (ws) {
-    log("ws", "Closing previous connection before reconnecting...");
+    log("ws", "", "Closing previous connection before reconnecting...");
     ws.close();
-    clear();
   }
 
-  log("ws", "Connecting to", url, "...");
+  log("ws", "", "Connecting", "...");
   ws = new WebSocket(url);
 
   ws.addEventListener("message", async (event) => {
     let data = typeof event.data === "string" ? data : await event.data.text();
-    const { user = "system", message = "" } = data.startsWith("{")
-      ? JSON.parse(data)
-      : { message: data };
-    log(user, typeof message === "string" ? message : JSON.stringify(message));
+    const { user = "system", message = "" } = JSON.parse(data);
+    const hashedEmail = await hashEmail(user);
+    log(
+      user,
+      hashedEmail,
+      typeof message === "string" ? message : JSON.stringify(message)
+    );
   });
 
   await new Promise((resolve) => ws.addEventListener("open", resolve));
-  log("ws", "Connected!");
-};
-
-const clear = () => {
-  store.messages.splice(0, store.messages.length);
-  log("system", "previous messages cleared");
+  log("ws", "", "Connected!");
 };
 
 const send = () => {
@@ -160,12 +135,8 @@ const send = () => {
   store.message = "";
 };
 
-const ping = () => {
-  log("ws", "Sending ping");
-  ws.send("ping");
-};
-
 onMounted(async () => {
+  store.username = prompt("What's your email?");
   await connect();
 });
 </script>
