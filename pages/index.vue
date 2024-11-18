@@ -1,6 +1,27 @@
 <template>
   <div class="h-screen flex flex-col justify-between">
     <main>
+      <div class="flex flex-col p-3 fixed top-0 right-0 border-2">
+        <p>live users: {{ store.usersList.length }}</p>
+        <ul>
+          <li
+            class="flex items-center gap-1 mb-2"
+            v-for="(user, index) in store.usersList"
+          >
+            <img
+              :src="
+                'https://www.gravatar.com/avatar/' +
+                encodeURIComponent(store.usersHashList[index]) +
+                '?s=512&d=monsterid'
+              "
+              alt="Avatar"
+              class="w-8 h-8 rounded-full"
+            />
+            {{ user }}
+          </li>
+        </ul>
+      </div>
+
       <!-- Messages -->
       <div id="messages" class="flex-grow flex flex-col justify-end px-4 py-8">
         <div class="flex items-center mb-4" v-for="message in store.messages">
@@ -59,7 +80,22 @@ const store = reactive({
   messages: [],
   username: "anonymous",
   emailHash: "",
+  usersList: [],
+  usersHashList: [],
 });
+
+async function updateHashList() {
+  store.usersHashList = await Promise.all(
+    store.usersList.map((user) => hashEmail(user))
+  );
+}
+
+watch(
+  () => store.usersList,
+  async () => {
+    await updateHashList();
+  }
+);
 
 async function hashEmail(email) {
   const encoder = new TextEncoder();
@@ -105,16 +141,24 @@ const connect = async () => {
     "/_ws" +
     `?username=${store.username}`;
   if (ws) {
-    log("ws", "", "Closing previous connection before reconnecting...");
     ws.close();
   }
 
-  log("ws", "", "Connecting", "...");
   ws = new WebSocket(url);
 
   ws.addEventListener("message", async (event) => {
     let data = typeof event.data === "string" ? data : await event.data.text();
-    const { user = "system", message = "" } = JSON.parse(data);
+    const {
+      user = "system",
+      message = "",
+      action = "message",
+      usersList = [],
+    } = JSON.parse(data);
+
+    if (action === "usersListUpdate") {
+      store.usersList = usersList;
+      return;
+    }
     const hashedEmail = await hashEmail(user);
     log(
       user,
@@ -124,7 +168,6 @@ const connect = async () => {
   });
 
   await new Promise((resolve) => ws.addEventListener("open", resolve));
-  log("ws", "", "Connected!");
 };
 
 const send = () => {
