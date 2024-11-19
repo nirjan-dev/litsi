@@ -147,7 +147,8 @@ const connect = async () => {
   ws = new WebSocket(url);
 
   ws.addEventListener("message", async (event) => {
-    let data = typeof event.data === "string" ? data : await event.data.text();
+    let data =
+      typeof event.data === "string" ? event.data : await event.data.text();
     const {
       user = "system",
       message = "",

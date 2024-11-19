@@ -2,10 +2,11 @@ const connectedUsers = new Set();
 
 export default defineWebSocketHandler({
   open(peer) {
-    console.log("WebSocket connected");
     const url = new URL(peer.request?.url || "");
     const username = url.searchParams.get("username") ?? "anonymous";
     (peer as any).username = username;
+
+    console.log("WebSocket connected for user: ", username);
 
     peer.publish("chat", {
       user: "server",
@@ -26,11 +27,17 @@ export default defineWebSocketHandler({
     });
   },
   message(peer, message) {
+    if (typeof message === "string" && message === "ping") {
+      peer.send("pong");
+      return;
+    }
+
     const msg = {
       user: (peer as any).username,
       message: message.toString(),
     };
     peer.send(msg); // echo
+    console.log(`sending message to chat by ${(peer as any).username}`);
     peer.publish("chat", msg);
   },
   close(peer) {
@@ -45,5 +52,7 @@ export default defineWebSocketHandler({
       action: "usersListUpdate",
       usersList: Array.from(connectedUsers),
     });
+
+    console.log("WebSocket closed for user: ", (peer as any).username);
   },
 });
