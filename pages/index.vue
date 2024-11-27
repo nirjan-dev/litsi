@@ -2,8 +2,8 @@
   <div class="h-screen flex flex-col justify-between">
     <main class="grid grid-cols-12 min-h-svh">
       <section class="col-span-12 md:col-span-9">
-        <div id="videos">
-          <video class="w-full" id="localVideo" autoplay muted></video>
+        <div id="videos" class="grid grid-cols-2 h-full">
+          <video id="localVideo" autoplay muted></video>
         </div>
       </section>
       <section class="col-span-12 md:col-span-3 bg-gray-100">
@@ -210,6 +210,12 @@ function addPeer(username, isInitiator) {
         {
           urls: "stun:stun2.l.google.com:19302",
         },
+        {
+          urls: "stun:stun3.l.google.com:19302",
+        },
+        {
+          urls: "stun:stun4.l.google.com:19302",
+        },
       ],
     },
   });
@@ -282,11 +288,11 @@ function initVideoCall(stream) {
 
 onMounted(async () => {
   store.username = prompt("What's your email?");
-  await connect();
 
   navigator.mediaDevices
     .getUserMedia({ video: true, audio: true })
-    .then((stream) => {
+    .then(async (stream) => {
+      await connect();
       initVideoCall(stream);
     })
     .catch((err) => {
