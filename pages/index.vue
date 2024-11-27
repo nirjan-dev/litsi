@@ -1,78 +1,89 @@
 <template>
   <div class="h-screen flex flex-col justify-between">
-    <main>
-      <div class="flex flex-col p-3 fixed top-0 right-0 border-2">
-        <p>live users: {{ store.usersList.length }}</p>
-        <ul>
-          <li
-            class="flex items-center gap-1 mb-2"
-            v-for="(user, index) in store.usersList"
-          >
-            <img
-              :src="
-                'https://www.gravatar.com/avatar/' +
-                encodeURIComponent(store.usersHashList[index]) +
-                '?s=512&d=monsterid'
-              "
-              alt="Avatar"
-              class="w-8 h-8 rounded-full"
-            />
-            {{ user }}
-          </li>
-        </ul>
-      </div>
-
-      <!-- Messages -->
-      <div id="messages" class="flex-grow flex flex-col justify-end px-4 py-8">
-        <div class="flex items-center mb-4" v-for="message in store.messages">
-          <div class="flex flex-col">
-            <p class="text-gray-500 mb-1 text-xs ml-10">{{ message.user }}</p>
-            <div class="flex items-center">
+    <main class="grid grid-cols-12 min-h-svh">
+      <section class="col-span-12 md:col-span-9">
+        <div id="videos">
+          <video class="w-full" id="localVideo" autoplay muted></video>
+        </div>
+      </section>
+      <section class="col-span-12 md:col-span-3 bg-gray-100">
+        <div class="flex max-h-64 overflow-y-scroll flex-col p-3">
+          <p>live users: {{ store.usersList.length }}</p>
+          <ul>
+            <li
+              class="flex items-center gap-1 mb-2"
+              v-for="(user, index) in store.usersList"
+            >
               <img
                 :src="
                   'https://www.gravatar.com/avatar/' +
-                  encodeURIComponent(message.emailHash) +
+                  encodeURIComponent(store.usersHashList[index]) +
                   '?s=512&d=monsterid'
                 "
                 alt="Avatar"
                 class="w-8 h-8 rounded-full"
               />
-              <div class="ml-2 bg-gray-800 rounded-lg p-2">
-                <p class="text-white">{{ message.text }}</p>
+              {{ user }}
+            </li>
+          </ul>
+        </div>
+
+        <!-- Messages -->
+        <div
+          id="messages"
+          class="flex-grow flex flex-col justify-end px-4 py-8"
+        >
+          <div class="flex items-center mb-4" v-for="message in store.messages">
+            <div class="flex flex-col">
+              <p class="text-gray-500 mb-1 text-xs ml-10">{{ message.user }}</p>
+              <div class="flex items-center">
+                <img
+                  :src="
+                    'https://www.gravatar.com/avatar/' +
+                    encodeURIComponent(message.emailHash) +
+                    '?s=512&d=monsterid'
+                  "
+                  alt="Avatar"
+                  class="w-8 h-8 rounded-full"
+                />
+                <div class="ml-2 bg-gray-800 rounded-lg p-2">
+                  <p class="text-white">{{ message.text }}</p>
+                </div>
               </div>
+              <p class="text-gray-500 mt-1 text-xs ml-10">{{ message.date }}</p>
             </div>
-            <p class="text-gray-500 mt-1 text-xs ml-10">{{ message.date }}</p>
           </div>
         </div>
-      </div>
 
-      <!-- Chatbox -->
-      <div
-        class="bg-gray-800 px-4 py-2 flex items-center justify-between fixed bottom-0 w-full"
-      >
-        <div class="w-full min-w-6">
-          <input
-            type="text"
-            placeholder="Type your message..."
-            class="w-full rounded-l-lg px-4 py-2 bg-gray-700 text-white focus:outline-none focus:ring focus:border-blue-300"
-            @keydown.enter="send"
-            v-model="store.message"
-          />
+        <!-- Chatbox -->
+        <div
+          class="bg-gray-800 px-4 py-2 flex items-center justify-between fixed bottom-0 w-full"
+        >
+          <div class="w-full min-w-6">
+            <input
+              type="text"
+              placeholder="Type your message..."
+              class="w-full rounded-l-lg px-4 py-2 bg-gray-700 text-white focus:outline-none focus:ring focus:border-blue-300"
+              @keydown.enter="send"
+              v-model="store.message"
+            />
+          </div>
+          <div class="flex">
+            <button
+              class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4"
+              @click="send"
+            >
+              Send
+            </button>
+          </div>
         </div>
-        <div class="flex">
-          <button
-            class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4"
-            @click="send"
-          >
-            Send
-          </button>
-        </div>
-      </div>
+      </section>
     </main>
   </div>
 </template>
 
 <script setup>
+import SimplePeer from "simple-peer/simplepeer.min.js";
 let ws;
 
 const store = reactive({
@@ -83,6 +94,9 @@ const store = reactive({
   usersList: [],
   usersHashList: [],
 });
+
+const peers = {};
+let localStream;
 
 async function updateHashList() {
   store.usersHashList = await Promise.all(
@@ -148,39 +162,135 @@ const connect = async () => {
 
   ws.addEventListener("message", async (event) => {
     let data =
-      typeof event.data === "string" ? event.data : await event.data.text();
-    const {
-      user = "system",
-      message = "",
-      action = "message",
-      usersList = [],
-    } = JSON.parse(data);
+      typeof event.data === "string"
+        ? event.data
+        : await event.data.text().then((text) => JSON.parse(text));
+    console.log(data);
 
-    if (action === "usersListUpdate") {
-      store.usersList = usersList;
-      return;
+    switch (data.type) {
+      case "newCallerJoined":
+        addPeer(data.payload.username, false);
+        ws.send(
+          JSON.stringify({ type: "newCallerReceived", payload: data.payload })
+        );
+        return;
+
+      case "newCallerReceived":
+        addPeer(data.payload.username, true);
+        return;
+      case "signal":
+        peers[data.payload.username].signal(data.payload.signal);
+        return;
+      case "message":
+        const hashedEmail = await hashEmail(data.payload.username);
+        log(data.payload.username, hashedEmail, data.payload.message);
+        return;
+      case "usersListUpdate":
+        store.usersList = data.payload.usersList;
+        return;
+
+      default:
+        break;
     }
-    const hashedEmail = await hashEmail(user);
-    log(
-      user,
-      hashedEmail,
-      typeof message === "string" ? message : JSON.stringify(message)
-    );
+  });
+};
+
+function addPeer(username, isInitiator) {
+  peers[username] = new SimplePeer({
+    initiator: isInitiator,
+    stream: localStream,
+    config: {
+      iceServers: [
+        {
+          urls: "stun:stun.l.google.com:19302",
+        },
+        {
+          urls: "stun:stun1.l.google.com:19302",
+        },
+        {
+          urls: "stun:stun2.l.google.com:19302",
+        },
+      ],
+    },
   });
 
-  await new Promise((resolve) => ws.addEventListener("open", resolve));
-};
+  peers[username].on("signal", (data) => {
+    console.log(data, "signal");
+    ws.send(
+      JSON.stringify({
+        type: "signal",
+        payload: {
+          signal: data,
+          username,
+        },
+      })
+    );
+  });
+  peers[username].on("stream", (stream) => {
+    console.log(stream, "stream");
+    // video
+    const newVid = document.createElement("video");
+    newVid.srcObject = stream;
+
+    newVid.playsinline = false;
+    newVid.autoplay = true;
+    newVid.className = "vid";
+
+    const videos = document.getElementById("videos");
+    videos.appendChild(newVid);
+  });
+
+  peers[username].on("error", (data) => {
+    console.log(data, "error");
+  });
+
+  peers[username].on("close", () => {
+    peers[username].destroy();
+    delete peers[username];
+  });
+
+  peers[username].on("connect", (data) => {
+    console.log(data, "connect");
+  });
+
+  peers[username].on("data", (data) => {
+    console.log(data, "data");
+  });
+}
 
 const send = () => {
   console.log("sending message...");
   if (store.message) {
-    ws.send(store.message);
+    ws.send(
+      JSON.stringify({
+        type: "message",
+        payload: {
+          message: store.message,
+          username: store.username,
+        },
+      })
+    );
   }
   store.message = "";
 };
 
+function initVideoCall(stream) {
+  const localVideo = document.getElementById("localVideo");
+  localVideo.srcObject = stream;
+  localStream = stream;
+}
+
 onMounted(async () => {
   store.username = prompt("What's your email?");
   await connect();
+
+  navigator.mediaDevices
+    .getUserMedia({ video: true, audio: true })
+    .then((stream) => {
+      initVideoCall(stream);
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 });
 </script>
