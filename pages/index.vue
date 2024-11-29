@@ -1,5 +1,11 @@
 <template>
   <div class="h-screen flex flex-col justify-between">
+    <button
+      class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4"
+      @click="handleScreenShare"
+    >
+      share screen
+    </button>
     <main class="grid grid-cols-12 min-h-svh">
       <section class="col-span-12 md:col-span-9">
         <div id="videos" class="grid grid-cols-2 h-full">
@@ -97,6 +103,28 @@ const store = reactive({
 
 const peers = {};
 let localStream;
+let screenShareStream;
+
+function handleScreenShare() {
+  navigator.mediaDevices
+    .getDisplayMedia({ video: true, audio: true })
+    .then((stream) => {
+      screenShareStream = stream;
+
+      for (const peer in peers) {
+        peers[peer].addStream(screenShareStream);
+      }
+
+      const video = document.createElement("video");
+      video.srcObject = screenShareStream;
+      video.autoplay = true;
+      video.playsInline = true;
+      document.getElementById("videos").appendChild(video);
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+}
 
 async function updateHashList() {
   store.usersHashList = await Promise.all(
@@ -198,7 +226,7 @@ const connect = async () => {
 function addPeer(username, isInitiator) {
   peers[username] = new SimplePeer({
     initiator: isInitiator,
-    stream: localStream,
+    streams: [localStream],
     config: {
       iceServers: [
         {
@@ -287,7 +315,7 @@ function initVideoCall(stream) {
 }
 
 onMounted(async () => {
-  store.username = prompt("What's your email?");
+  store.username = prompt("enter your name or email");
 
   navigator.mediaDevices
     .getUserMedia({ video: true, audio: true })
