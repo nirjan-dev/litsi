@@ -9,7 +9,7 @@
     <main class="grid grid-cols-12 min-h-svh">
       <section class="col-span-12 md:col-span-9">
         <div id="videos" class="grid grid-cols-2 h-full">
-          <video id="localVideo" autoplay muted></video>
+          <video controls id="localVideo" autoplay muted></video>
         </div>
       </section>
       <section class="col-span-12 md:col-span-3 bg-gray-100">
@@ -107,7 +107,12 @@ let screenShareStream;
 
 function handleScreenShare() {
   navigator.mediaDevices
-    .getDisplayMedia({ video: true, audio: true })
+    .getDisplayMedia({
+      audio: true,
+      monitorTypeSurfaces: "include",
+      surfaceSwitching: "include",
+      video: true,
+    })
     .then((stream) => {
       screenShareStream = stream;
 
@@ -119,6 +124,7 @@ function handleScreenShare() {
       video.srcObject = screenShareStream;
       video.autoplay = true;
       video.playsInline = true;
+      video.controls = true;
       document.getElementById("videos").appendChild(video);
     })
     .catch((err) => {
@@ -269,6 +275,8 @@ function addPeer(username, isInitiator) {
     newVid.playsinline = false;
     newVid.autoplay = true;
     newVid.className = "vid";
+    newVid.controls = true;
+    newVid.id = username;
 
     const videos = document.getElementById("videos");
     videos.appendChild(newVid);
@@ -276,11 +284,11 @@ function addPeer(username, isInitiator) {
 
   peers[username].on("error", (data) => {
     console.log(data, "error");
+    removePeer(username);
   });
 
   peers[username].on("close", () => {
-    peers[username].destroy();
-    delete peers[username];
+    removePeer(username);
   });
 
   peers[username].on("connect", (data) => {
@@ -307,6 +315,17 @@ const send = () => {
   }
   store.message = "";
 };
+
+function removePeer(username) {
+  peers[username]?.destroy();
+  delete peers[username];
+
+  const videos = document.getElementById("videos");
+  const vid = document.getElementById(username);
+  if (vid) {
+    videos.removeChild(vid);
+  }
+}
 
 function initVideoCall(stream) {
   const localVideo = document.getElementById("localVideo");
