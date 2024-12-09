@@ -203,14 +203,14 @@ const connect = async () => {
 
     switch (data.type) {
       case "newCallerJoined":
-        addPeer(data.payload.username, false);
+        await addPeer(data.payload.username, false);
         ws.send(
           JSON.stringify({ type: "newCallerReceived", payload: data.payload })
         );
         return;
 
       case "newCallerReceived":
-        addPeer(data.payload.username, true);
+        await addPeer(data.payload.username, true);
         return;
       case "signal":
         peers[data.payload.username].signal(data.payload.signal);
@@ -229,28 +229,22 @@ const connect = async () => {
   });
 };
 
-function addPeer(username, isInitiator) {
+async function addPeer(username, isInitiator) {
+  if (!username) {
+    return;
+  }
+
+  const { iceServers } = await $fetch(`/api/getIceUrls`);
+
+  if (!iceServers) {
+    return;
+  }
+
   peers[username] = new SimplePeer({
     initiator: isInitiator,
     streams: [localStream],
     config: {
-      iceServers: [
-        {
-          urls: "stun:stun.l.google.com:19302",
-        },
-        {
-          urls: "stun:stun1.l.google.com:19302",
-        },
-        {
-          urls: "stun:stun2.l.google.com:19302",
-        },
-        {
-          urls: "stun:stun3.l.google.com:19302",
-        },
-        {
-          urls: "stun:stun4.l.google.com:19302",
-        },
-      ],
+      iceServers: [iceServers],
     },
   });
 
