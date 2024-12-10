@@ -1,11 +1,19 @@
 <template>
   <div class="h-screen flex flex-col justify-between">
-    <button
-      class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4"
-      @click="handleScreenShare"
-    >
-      share screen
-    </button>
+    <div class="flex gap-2 justify-center py-2">
+      <button
+        class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4"
+        @click="copyRoomLink"
+      >
+        {{ hasCopiedLink ? "copied!" : "copy room link" }}
+      </button>
+      <button
+        class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4"
+        @click="handleScreenShare"
+      >
+        share screen
+      </button>
+    </div>
     <main class="grid grid-cols-12 min-h-svh">
       <section class="col-span-12 md:col-span-9">
         <div id="videos" class="grid grid-cols-2 h-full">
@@ -102,10 +110,21 @@ const store = reactive({
 });
 
 store.username = useRoute().query.username;
-
+const roomID = useRoute().params.roomID;
 const peers = {};
 let localStream;
 let screenShareStream;
+const hasCopiedLink = ref(false);
+
+function copyRoomLink() {
+  const url = window.location.origin + "/join" + `?roomID=${roomID}`;
+  navigator.clipboard.writeText(url).then(() => {
+    hasCopiedLink.value = true;
+    setTimeout(() => {
+      hasCopiedLink.value = false;
+    }, 2000);
+  });
+}
 
 function handleScreenShare() {
   navigator.mediaDevices
@@ -189,7 +208,7 @@ const connect = async () => {
     (isSecure ? "wss://" : "ws://") +
     location.host +
     "/_ws" +
-    `?username=${store.username}`;
+    `?username=${store.username}&roomID=${roomID}`;
   if (ws) {
     ws.close();
   }

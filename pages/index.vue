@@ -16,6 +16,8 @@
             type="text"
             name="roomLink"
             id="roomLink"
+            required
+            v-model="roomLink"
           />
         </label>
         <button
@@ -31,8 +33,22 @@
 </template>
 
 <script setup lang="ts">
+const roomLink = ref("");
 function joinRoom() {
-  const roomID = crypto.randomUUID();
+  if (!roomLink.value) {
+    const roomID = crypto.randomUUID();
+    useRouter().push(`/join?roomID=${roomID}`);
+
+    return;
+  }
+
+  const url = new URL(roomLink.value);
+  const roomID = url.searchParams.get("roomID");
+
+  if (!roomID) {
+    alert("Invalid room link");
+    return;
+  }
 
   useRouter().push(`/join?roomID=${roomID}`);
 }

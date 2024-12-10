@@ -1,7 +1,8 @@
 type Peer = Parameters<
   NonNullable<Parameters<typeof defineWebSocketHandler>[0]["open"]>
->[0];
-const connectedUsers = new Map<string, Peer>();
+>[0] & { username?: string; roomID?: string };
+type MeetingRoom = Map<string, Peer>;
+const rooms = new Map<string, MeetingRoom>();
 
 type PeerMessage = {
   type:
@@ -16,17 +17,17 @@ type PeerMessage = {
   };
 };
 
-function sendUpdateChatUsersEvent(peer: Peer) {
-  peer.publish("chat", {
+function sendUpdateChatUsersEvent(meetingRoom: MeetingRoom, peer: Peer) {
+  peer.publish((peer as Peer).roomID!, {
     type: "usersListUpdate",
     payload: {
-      usersList: Array.from(connectedUsers.keys()),
+      usersList: Array.from(meetingRoom.keys()),
     },
   });
   peer.send({
     type: "usersListUpdate",
     payload: {
-      usersList: Array.from(connectedUsers.keys()),
+      usersList: Array.from(meetingRoom.keys()),
     },
   });
 }
@@ -35,17 +36,33 @@ export default defineWebSocketHandler({
   open(peer) {
     const url = new URL(peer.request?.url || "");
     const username = url.searchParams.get("username") ?? "anonymous";
-    (peer as any).username = username;
+    const room = url.searchParams.get("roomID");
+    if (!room) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: "Room is required",
+      });
+    }
+    // TODO: add validation for existing username and don't allow empty usernames
 
+    let meetingRoom: MeetingRoom;
+    if (!rooms.has(room)) {
+      meetingRoom = rooms.set(room, new Map()).get(room)!;
+      console.log(`created new meeting room: ${room}`);
+    } else {
+      meetingRoom = rooms.get(room)!;
+      console.log(`joined existing meeting room: ${room}`);
+    }
+
+    (peer as Peer).username = username;
+    (peer as Peer).roomID = room;
     console.log("WebSocket connected for user: ", username);
+    peer.subscribe(room);
+    meetingRoom?.set(username, peer);
 
-    peer.subscribe("chat");
+    sendUpdateChatUsersEvent(meetingRoom, peer);
 
-    connectedUsers.set(username, peer);
-
-    sendUpdateChatUsersEvent(peer);
-
-    peer.publish("chat", {
+    peer.publish(room, {
       type: "newCallerJoined",
       payload: {
         username,
@@ -61,9 +78,10 @@ export default defineWebSocketHandler({
     // TODO: parse message properly
     const messageJson = message.json() as PeerMessage;
     console.log(messageJson);
-    const messageSender = (peer as any).username;
+    const messageSender = (peer as Peer).username;
     const messageReceiver = messageJson.payload.username;
-    const messageReceiverPeer = connectedUsers.get(messageReceiver);
+    const meetingRoom = rooms.get((peer as Peer).roomID ?? "")!;
+    const messageReceiverPeer = meetingRoom.get(messageReceiver);
 
     switch (messageJson.type) {
       case "signal":
@@ -108,14 +126,14 @@ export default defineWebSocketHandler({
         return;
       default:
         console.log("Unknown message type: ", messageJson.type);
-
         return;
     }
   },
   close(peer) {
-    connectedUsers.delete((peer as any).username);
+    const meetingRoom = rooms.get((peer as Peer).roomID ?? "")!;
+    meetingRoom.delete((peer as Peer).username!);
 
-    sendUpdateChatUsersEvent(peer);
+    sendUpdateChatUsersEvent(meetingRoom, peer);
 
     console.log("WebSocket closed for user: ", (peer as any).username);
   },
