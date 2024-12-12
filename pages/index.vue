@@ -1,18 +1,17 @@
 <template>
   <div class="flex items-center flex-col justify-center h-screen px-6">
     <h1 class="text-2xl md:text-4xl py-4">Welcome to NK chat</h1>
-    <div class="flex flex-col gap-4 text-center">
-      <button @click="joinRoom" class="mr-2 py-2 px-2 border-2">
-        Create room
-      </button>
+    <div class="flex flex-col gap-6 text-center">
+      <UButton block @click="joinRoom"> Create new room </UButton>
 
       <hr />
 
       <form action="" class="flex flex-col gap-2">
         <label for="roomLink"
           >Enter room link
-          <input
-            class="w-full p-1 border-b-2 bg-gray-100"
+          <UInput
+            class="my-1 w-full p-1"
+            size="sm"
             type="text"
             name="roomLink"
             id="roomLink"
@@ -20,13 +19,14 @@
             v-model="roomLink"
           />
         </label>
-        <button
-          class="py-2 px-2 border-2"
+        <UButton
+          block
+          variant="outline"
           @click.prevent="joinRoom"
           type="submit"
         >
           Join
-        </button>
+        </UButton>
       </form>
     </div>
   </div>

@@ -9,9 +9,10 @@ export default defineNuxtConfig({
     },
   },
 
-  modules: ["@nuxtjs/tailwindcss"],
   runtimeConfig: {
     turnID: "",
     turnToken: "",
   },
+
+  modules: ["@nuxt/ui"],
 });

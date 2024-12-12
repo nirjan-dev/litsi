@@ -4,8 +4,8 @@
     <form action="" class="flex flex-col gap-2">
       <label for="username"
         >Enter your display name
-        <input
-          class="w-full p-1 border-b-2 bg-gray-100"
+        <UInput
+          class="w-full p-1"
           type="text"
           name="username"
           id="username"
@@ -13,13 +13,7 @@
           v-model="username"
         />
       </label>
-      <button
-        @click.prevent="enterRoom"
-        class="py-2 px-2 border-2"
-        type="submit"
-      >
-        Join
-      </button>
+      <UButton block @click.prevent="enterRoom" type="submit"> Join </UButton>
     </form>
   </div>
 </template>

@@ -1,47 +1,20 @@
 <template>
-  <div class="h-screen flex flex-col justify-between">
-    <div class="flex gap-2 justify-center py-2">
-      <button
-        class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4"
-        @click="copyRoomLink"
+  <div class="h-screen flex flex-col justify-between pb-20">
+    <main class="min-h-svh">
+      <section
+        class="w-full h-full"
+        :class="controls.isChatOpen ? 'md:w-3/4' : ''"
       >
-        {{ hasCopiedLink ? "copied!" : "copy room link" }}
-      </button>
-      <button
-        class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4"
-        @click="handleScreenShare"
-      >
-        share screen
-      </button>
-    </div>
-    <main class="grid grid-cols-12 min-h-svh">
-      <section class="col-span-12 md:col-span-9">
-        <div id="videos" class="grid grid-cols-2 h-full">
-          <video controls id="localVideo" autoplay muted></video>
+        <div id="videos" class="stream-container">
+          <div class="stream">
+            <video id="localVideo" autoplay muted></video>
+          </div>
         </div>
       </section>
-      <section class="col-span-12 md:col-span-3 bg-gray-100">
-        <div class="flex max-h-64 overflow-y-scroll flex-col p-3">
-          <p>live users: {{ store.usersList.length }}</p>
-          <ul>
-            <li
-              class="flex items-center gap-1 mb-2"
-              v-for="(user, index) in store.usersList"
-            >
-              <img
-                :src="
-                  'https://www.gravatar.com/avatar/' +
-                  encodeURIComponent(store.usersHashList[index]) +
-                  '?s=512&d=monsterid'
-                "
-                alt="Avatar"
-                class="w-8 h-8 rounded-full"
-              />
-              {{ user }}
-            </li>
-          </ul>
-        </div>
-
+      <section
+        v-show="controls.isChatOpen"
+        class="fixed right-0 bottom-10 md:bottom-14 top-0 w-full md:w-1/4 z-50 bg-gray-800 flex flex-col justify-between"
+      >
         <!-- Messages -->
         <div
           id="messages"
@@ -71,7 +44,7 @@
 
         <!-- Chatbox -->
         <div
-          class="bg-gray-800 px-4 py-2 flex items-center justify-between fixed bottom-0 w-full"
+          class="bg-gray-800 px-4 py-2 flex items-center justify-between w-full"
         >
           <div class="w-full min-w-6">
             <input
@@ -93,12 +66,125 @@
         </div>
       </section>
     </main>
+
+    <section class="fixed bg-gray-800 bottom-0 left-0 right-0 py-2">
+      <div class="flex gap-4 items-center justify-center px-4">
+        <div class="flex gap-4 text-xs">
+          <div class="flex items-center flex-col gap-1">
+            <UToggle
+              on-icon="i-material-symbols:volume-off"
+              off-icon="i-material-symbols:volume-up"
+              v-model="controls.isAudioMuted"
+            />
+            <span class="hidden md:block">Audio</span>
+          </div>
+          <div class="flex items-center flex-col gap-1">
+            <UToggle
+              on-icon="i-material-symbols:videocam-off"
+              off-icon="i-material-symbols:videocam"
+              v-model="controls.isVideoDisabled"
+            />
+            <span class="hidden md:block">Video</span>
+          </div>
+          <div class="flex items-center flex-col gap-1">
+            <UToggle
+              on-icon="i-material-symbols:screen-share"
+              off-icon="i-material-symbols:stop-screen-share"
+              v-model="controls.isScreenShared"
+            />
+            <span class="hidden md:block">Screen Share</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1">
+          <UButton
+            @click="copyRoomLink"
+            variant="ghost"
+            color="gray"
+            size="xs"
+            class="flex items-center flex-col"
+            icon="i-material-symbols:content-copy"
+          >
+            <span class="hidden md:block">{{
+              hasCopiedLink ? "Copied!" : "Copy room link"
+            }}</span>
+          </UButton>
+          <UButton
+            @click="toggleChat"
+            color="gray"
+            variant="ghost"
+            class="flex items-center flex-col"
+            icon="i-material-symbols:chat"
+            size="xs"
+          >
+            <span class="hidden md:block">{{
+              controls.isChatOpen ? "Hide chat" : "Show chat"
+            }}</span>
+          </UButton>
+          <UButton
+            variant="ghost"
+            @click="leaveRoom"
+            color="red"
+            class="flex items-center flex-col"
+            icon="i-material-symbols:logout"
+            size="xs"
+          >
+            <span class="hidden md:block">Leave room</span>
+          </UButton>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup>
 import SimplePeer from "simple-peer/simplepeer.min.js";
 let ws;
+
+let streamTracker = null;
+let streamsToTrack = [];
+
+const controls = reactive({
+  isVideoDisabled: false,
+  isAudioMuted: false,
+  isScreenShared: false,
+  isChatOpen: false,
+});
+
+watch(
+  () => controls.isVideoDisabled,
+  () => {
+    if (localStream) {
+      localStream.getVideoTracks()[0].enabled = !controls.isVideoDisabled;
+    }
+  }
+);
+watch(
+  () => controls.isAudioMuted,
+  () => {
+    if (localStream) {
+      localStream.getAudioTracks()[0].enabled = !controls.isAudioMuted;
+    }
+  }
+);
+
+watch(
+  () => controls.isScreenShared,
+  () => {
+    if (screenShareStream) {
+      screenShareStream.getVideoTracks().forEach((track) => {
+        track.stop();
+      });
+      removeVideo(screenShareStream.id);
+      for (const peer in peers) {
+        peers[peer].removeStream(screenShareStream);
+      }
+      screenShareStream = null;
+    } else {
+      handleScreenShare();
+    }
+  }
+);
 
 const store = reactive({
   message: "",
@@ -126,6 +212,10 @@ function copyRoomLink() {
   });
 }
 
+function toggleChat() {
+  controls.isChatOpen = !controls.isChatOpen;
+}
+
 function handleScreenShare() {
   navigator.mediaDevices
     .getDisplayMedia({
@@ -141,12 +231,7 @@ function handleScreenShare() {
         peers[peer].addStream(screenShareStream);
       }
 
-      const video = document.createElement("video");
-      video.srcObject = screenShareStream;
-      video.autoplay = true;
-      video.playsInline = true;
-      video.controls = true;
-      document.getElementById("videos").appendChild(video);
+      addVideo(screenShareStream, screenShareStream.id);
     })
     .catch((err) => {
       console.log(err);
@@ -175,6 +260,11 @@ async function hashEmail(email) {
     .map((x) => x.toString(16).padStart(2, "0"))
     .join("");
   return hashHex;
+}
+
+function leaveRoom() {
+  ws.close();
+  useRouter().push("/");
 }
 
 const scroll = () => {
@@ -261,9 +351,15 @@ async function addPeer(username, isInitiator) {
     return;
   }
 
+  const streams = [localStream];
+
+  if (screenShareStream) {
+    streams.push(screenShareStream);
+  }
+
   peers[username] = new SimplePeer({
     initiator: isInitiator,
-    streams: [localStream],
+    streams,
     config: {
       iceServers: [iceServers],
     },
@@ -283,18 +379,7 @@ async function addPeer(username, isInitiator) {
   });
   peers[username].on("stream", (stream) => {
     console.log(stream, "stream");
-    // video
-    const newVid = document.createElement("video");
-    newVid.srcObject = stream;
-
-    newVid.playsinline = false;
-    newVid.autoplay = true;
-    newVid.className = "vid";
-    newVid.controls = true;
-    newVid.id = username;
-
-    const videos = document.getElementById("videos");
-    videos.appendChild(newVid);
+    addVideo(stream, stream.id);
   });
 
   peers[username].on("error", (data) => {
@@ -313,6 +398,33 @@ async function addPeer(username, isInitiator) {
   peers[username].on("data", (data) => {
     console.log(data, "data");
   });
+}
+
+function addVideo(stream, streamID) {
+  const newVid = document.createElement("video");
+  const videoContainer = document.createElement("div");
+  videoContainer.classList.add("stream");
+  videoContainer.id = streamID;
+  newVid.srcObject = stream;
+  newVid.playsinline = false;
+  newVid.autoplay = true;
+  newVid.className = "vid";
+  newVid.controls = true;
+  videoContainer.appendChild(newVid);
+  const videos = document.getElementById("videos");
+  videos.appendChild(videoContainer);
+
+  streamsToTrack.push(stream);
+}
+
+function removeVideo(streamID) {
+  const videos = document.getElementById("videos");
+  const vid = document.getElementById(streamID);
+  if (vid) {
+    videos.removeChild(vid);
+  }
+
+  streamsToTrack = streamsToTrack.filter((stream) => stream.id !== streamID);
 }
 
 const send = () => {
@@ -335,11 +447,7 @@ function removePeer(username) {
   peers[username]?.destroy();
   delete peers[username];
 
-  const videos = document.getElementById("videos");
-  const vid = document.getElementById(username);
-  if (vid) {
-    videos.removeChild(vid);
-  }
+  removeVideo(username);
 }
 
 function initVideoCall(stream) {
@@ -358,5 +466,37 @@ onMounted(async () => {
     .catch((err) => {
       console.log(err);
     });
+
+  streamTracker = setInterval(() => {
+    streamsToTrack.forEach((stream) => {
+      if (!stream.active && document.getElementById(stream.id)) {
+        removeVideo(stream.id);
+      }
+    });
+  }, 3000);
+});
+
+onBeforeUnmount(() => {
+  if (streamTracker) {
+    clearInterval(streamTracker);
+    streamTracker = null;
+  }
 });
 </script>
+
+<style>
+.stream-container {
+  @apply flex flex-wrap h-full md:flex-nowrap;
+}
+
+.stream-container .stream:nth-child(3):last-child {
+  @apply col-span-2;
+}
+.stream {
+  @apply bg-slate-900 relative overflow-hidden  w-full;
+
+  video {
+    @apply w-full absolute inset-0 h-full object-cover;
+  }
+}
+</style>
