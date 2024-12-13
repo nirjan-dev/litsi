@@ -2,14 +2,18 @@
   <div class="h-screen flex flex-col justify-between pb-20">
     <main class="min-h-svh">
       <section
-        class="w-full h-full"
+        class="video-section"
         :class="controls.isChatOpen ? 'md:w-3/4' : ''"
       >
-        <div id="videos" class="stream-container">
-          <div class="stream">
-            <video id="localVideo" autoplay muted></video>
+        <div class="stream-container-parent">
+          <div id="videos" class="stream-container">
+            <div class="stream">
+              <video id="localVideo" autoplay muted></video>
+            </div>
           </div>
         </div>
+
+        <div id="screenShare"></div>
       </section>
       <section
         v-show="controls.isChatOpen"
@@ -222,12 +226,12 @@ function handleScreenShare() {
     })
     .then((stream) => {
       screenShareStream = stream;
-
+      screenShareStream.isScreenShare = true;
       for (const peer in peers) {
         peers[peer].addStream(screenShareStream);
       }
 
-      addVideo(screenShareStream, screenShareStream.id);
+      addVideo(screenShareStream, screenShareStream.id, "screenShare");
     })
     .catch((err) => {
       console.log(err);
@@ -374,8 +378,12 @@ async function addPeer(username, isInitiator) {
     );
   });
   peers[username].on("stream", (stream) => {
-    console.log(stream, "stream");
-    addVideo(stream, stream.id);
+    console.log(stream, "stream", peers, peers[username]);
+    // INFO: assuming that screen share stream is always the second stream
+    const isScreenShare = peers[username]._remoteStreams.length === 2;
+    isScreenShare
+      ? addVideo(stream, stream.id, "screenShare")
+      : addVideo(stream, stream.id);
   });
 
   peers[username].on("error", (data) => {
@@ -396,7 +404,7 @@ async function addPeer(username, isInitiator) {
   });
 }
 
-function addVideo(stream, streamID) {
+function addVideo(stream, streamID, parentID) {
   const newVid = document.createElement("video");
   const videoContainer = document.createElement("div");
   videoContainer.classList.add("stream");
@@ -407,17 +415,16 @@ function addVideo(stream, streamID) {
   newVid.className = "vid";
   newVid.controls = true;
   videoContainer.appendChild(newVid);
-  const videos = document.getElementById("videos");
+  const videos = document.getElementById(parentID || "videos");
   videos.appendChild(videoContainer);
 
   streamsToTrack.push(stream);
 }
 
 function removeVideo(streamID) {
-  const videos = document.getElementById("videos");
   const vid = document.getElementById(streamID);
   if (vid) {
-    videos.removeChild(vid);
+    vid.parentNode.removeChild(vid);
   }
 
   streamsToTrack = streamsToTrack.filter((stream) => stream.id !== streamID);
@@ -481,8 +488,21 @@ onBeforeUnmount(() => {
 </script>
 
 <style>
+.video-section {
+  @apply flex h-full pb-10 flex-col md:flex-row;
+}
+
+.stream-container-parent {
+  @apply flex-1 h-full;
+  container-type: inline-size;
+}
+
 .stream-container {
-  @apply flex flex-wrap h-full md:flex-nowrap;
+  @apply flex flex-wrap h-full;
+
+  @container (min-width: 640px) {
+    @apply flex-nowrap;
+  }
 }
 
 .stream-container .stream:nth-child(3):last-child {
@@ -493,6 +513,22 @@ onBeforeUnmount(() => {
 
   video {
     @apply w-full absolute inset-0 h-full object-cover;
+  }
+}
+
+#screenShare {
+  @apply md:w-3/4 h-2/4 md:h-full w-full;
+
+  &:empty {
+    @apply w-0 h-0;
+  }
+
+  .stream {
+    @apply w-full h-full;
+  }
+
+  video {
+    @apply w-full h-full object-contain;
   }
 }
 </style>
