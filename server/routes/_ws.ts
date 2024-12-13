@@ -77,17 +77,21 @@ export default defineWebSocketHandler({
 
     // TODO: parse message properly
     const messageJson = message.json() as PeerMessage;
-    console.log(messageJson);
+
+    // TODO: add development logging
+    // console.log(messageJson);
+
     const messageSender = (peer as Peer).username;
     const messageReceiver = messageJson.payload.username;
-    const meetingRoom = rooms.get((peer as Peer).roomID ?? "")!;
+    const roomID = (peer as Peer).roomID ?? "";
+    const meetingRoom = rooms.get(roomID)!;
     const messageReceiverPeer = meetingRoom.get(messageReceiver);
 
     switch (messageJson.type) {
       case "signal":
-        console.log(
-          `sending signal to ${messageReceiver} from ${messageSender}`
-        );
+        // console.log(
+        //   `sending signal to ${messageReceiver} from ${messageSender}`
+        // );
         messageReceiverPeer?.send({
           type: "signal",
           payload: {
@@ -97,9 +101,9 @@ export default defineWebSocketHandler({
         });
         return;
       case "newCallerReceived":
-        console.log(
-          `new caller ${messageReceiver} received from ${messageSender}`
-        );
+        // console.log(
+        //   `new caller ${messageReceiver} received from ${messageSender}`
+        // );
         messageReceiverPeer?.send({
           type: "newCallerReceived",
           payload: {
@@ -108,8 +112,8 @@ export default defineWebSocketHandler({
         });
         return;
       case "message":
-        console.log(`sending message to chat by ${messageSender}`);
-        peer.publish("chat", {
+        // console.log(`sending message to chat by ${messageSender}`);
+        peer.publish(roomID, {
           type: "message",
           payload: {
             username: messageSender,

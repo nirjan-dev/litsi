@@ -47,21 +47,17 @@
           class="bg-gray-800 px-4 py-2 flex items-center justify-between w-full"
         >
           <div class="w-full min-w-6">
-            <input
+            <UInput
+              size="md"
+              class="mr-1"
               type="text"
               placeholder="Type your message..."
-              class="w-full rounded-l-lg px-4 py-2 bg-gray-700 text-white focus:outline-none focus:ring focus:border-blue-300"
               @keydown.enter="send"
               v-model="store.message"
             />
           </div>
           <div class="flex">
-            <button
-              class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4"
-              @click="send"
-            >
-              Send
-            </button>
+            <UButton size="md" @click="send"> Send </UButton>
           </div>
         </div>
       </section>
