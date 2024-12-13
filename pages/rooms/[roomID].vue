@@ -263,6 +263,12 @@ async function hashEmail(email) {
 }
 
 function leaveRoom() {
+  localStream.getTracks().forEach((track) => {
+    track.stop();
+  });
+  for (const peer in peers) {
+    peers[peer].destroy();
+  }
   ws.close();
   useRouter().push("/");
 }
@@ -310,7 +316,7 @@ const connect = async () => {
       typeof event.data === "string"
         ? event.data
         : await event.data.text().then((text) => JSON.parse(text));
-    console.log(data);
+    // console.log(data);
 
     switch (data.type) {
       case "newCallerJoined":
@@ -366,7 +372,7 @@ async function addPeer(username, isInitiator) {
   });
 
   peers[username].on("signal", (data) => {
-    console.log(data, "signal");
+    // console.log(data, "signal");
     ws.send(
       JSON.stringify({
         type: "signal",
@@ -378,7 +384,7 @@ async function addPeer(username, isInitiator) {
     );
   });
   peers[username].on("stream", (stream) => {
-    console.log(stream, "stream", peers, peers[username]);
+    // console.log(stream, "stream", peers, peers[username]);
     // INFO: assuming that screen share stream is always the second stream
     const isScreenShare = peers[username]._remoteStreams.length === 2;
     isScreenShare
@@ -396,11 +402,11 @@ async function addPeer(username, isInitiator) {
   });
 
   peers[username].on("connect", (data) => {
-    console.log(data, "connect");
+    // console.log(data, "connect");
   });
 
   peers[username].on("data", (data) => {
-    console.log(data, "data");
+    // console.log(data, "data");
   });
 }
 
