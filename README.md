@@ -18,6 +18,14 @@ To get started, clone the repository and install the dependencies:
 pnpm install
 ```
 
+create a .env file by copying the example env file
+
+```bash
+cp .env.example .env
+```
+
+- You need to use [Cloudflare Turn](https://developers.cloudflare.com/calls/turn/generate-credentials/) to make the WebRTC connection work for clients on a different network.
+
 Then, start the development server:
 
 ```bash
@@ -66,10 +74,10 @@ Litsi Chat is licensed under the MIT License.
 ## Acknowledgements
 This project uses the following dependencies:
 
-- [Nuxt.js]()
-- [Simple Peer]()
-- [Vue.js]()
+- [Nuxt.js](https://nuxt.com/)
+- [Simple Peer](https://github.com/feross/simple-peer)
+- [Vue.js](https://vuejs.org/)
 
 
 ## Author
-[Nirjan Khadka]()
+[Nirjan Khadka](https://github.com/nirjan-dev/)
