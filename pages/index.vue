@@ -1,6 +1,6 @@
 <template>
   <div class="flex items-center flex-col justify-center h-screen px-6">
-    <h1 class="text-2xl md:text-4xl py-4">Welcome to NK chat</h1>
+    <h1 class="text-2xl md:text-4xl py-4">Welcome to Litsi chat</h1>
     <div class="flex flex-col gap-6 text-center">
       <UButton block @click="joinRoom"> Create new room </UButton>
 

@@ -1,6 +1,5 @@
 {
-  "name": "nuxt-app",
-  "private": true,
+  "name": "litsi",
   "type": "module",
   "scripts": {
     "build": "nuxt build",
