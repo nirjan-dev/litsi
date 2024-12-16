@@ -12,6 +12,11 @@ export default defineNuxtConfig({
   runtimeConfig: {
     turnID: "",
     turnToken: "",
+    public: {
+      telemetrydeck: {
+        appID: "",
+      },
+    },
   },
 
   modules: ["@nuxt/ui"],

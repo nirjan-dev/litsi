@@ -270,6 +270,7 @@ function leaveRoom() {
     peers[peer].destroy();
   }
   ws.close();
+  useAnalytics().trackEvent("ROOM.LEAVE", { roomID: roomID });
   useRouter().push("/");
 }
 
@@ -394,6 +395,7 @@ async function addPeer(username, isInitiator) {
 
   peers[username].on("error", (data) => {
     console.log(data, "error");
+    useAnalytics().trackEvent("PEER.ERROR", { roomID });
     removePeer(username);
   });
 
@@ -466,6 +468,9 @@ function initVideoCall(stream) {
 }
 
 onMounted(async () => {
+  useAnalytics().setUserID(store.username);
+  useAnalytics().trackEvent("ROOM.JOIN", { roomID });
+
   navigator.mediaDevices
     .getUserMedia({ video: true, audio: true })
     .then(async (stream) => {

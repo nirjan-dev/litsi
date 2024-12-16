@@ -11,6 +11,9 @@ importers:
       '@nuxt/ui':
         specifier: 2.20.0
         version: 2.20.0(change-case@5.4.4)(magicast@0.3.5)(rollup@4.26.0)(typescript@5.6.3)(vite@5.4.11(@types/node@22.9.0)(terser@5.36.0))(vue@3.5.12(typescript@5.6.3))
+      '@telemetrydeck/sdk':
+        specifier: ^2.0.4
+        version: 2.0.4
       nuxt:
         specifier: ^3.14.159
         version: 3.14.159(@parcel/watcher@2.5.0)(@types/node@22.9.0)(ioredis@5.4.1)(magicast@0.3.5)(rollup@4.26.0)(terser@5.36.0)(typescript@5.6.3)(vite@5.4.11(@types/node@22.9.0)(terser@5.36.0))
@@ -951,6 +954,10 @@ packages:
     resolution: {integrity: sha512-HEmblQrCkbadvcuis8MBCHvlTy9iUTFlEWfXy5nTxvSrauWPZ4Pyv0yOzXrDhnTXUMxJtpdUrov05RCusrBQ3A==}
     peerDependencies:
       vue: ^2.7.0 || ^3.0.0
+
+  '@telemetrydeck/sdk@2.0.4':
+    resolution: {integrity: sha512-x4S83AqSo6wvLJ6nRYdyJEqd9qmblUdBgsTRrjH5z++b9pnf2NMc8NpVAa48KIB1pRuP/GTGzXxVYdNoie/DVg==}
+    engines: {node: '>=18'}
 
   '@trysound/sax@0.2.0':
     resolution: {integrity: sha512-L7z9BgrNEcYyUYtF+HaEfiS5ebkh9jXqbszz7pC0hRBPaatV0XjSD3+eHrpqFemQfgwiFF0QPIarnIihIDn7OA==}
@@ -4770,6 +4777,8 @@ snapshots:
     dependencies:
       '@tanstack/virtual-core': 3.10.9
       vue: 3.5.12(typescript@5.6.3)
+
+  '@telemetrydeck/sdk@2.0.4': {}
 
   '@trysound/sax@0.2.0': {}
 
