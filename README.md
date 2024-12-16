@@ -1,75 +1,75 @@
-# Litsi chat
+# Litsi Chat
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Litsi Chat is a real-time video chat application built with Nuxt.js. It allows users to create and join rooms, and engage in private and instant video chats. The application is designed to be simple, secure, and easy to use.
 
-## Setup
+## Features
 
-Make sure to install dependencies:
+- Instant and private video chats
+- No sign-up or hassle
+- Pure peer-to-peer connection, nothing is stored on the server
+- Create rooms, invite friends, and chat instantly
+
+## Getting Started
+
+To get started, clone the repository and install the dependencies:
 
 ```bash
-# npm
-npm install
-
-# pnpm
+# pnpm or npm
 pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
 ```
 
-## Development Server
-
-Start the development server on `http://localhost:3000`:
+Then, start the development server:
 
 ```bash
-# npm
-npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
+pnpm run dev
 ```
 
-## Production
+The application will be running at http://localhost:3000.
 
-Build the application for production:
+## Project Structure
+The project is structured as follows:
 
-```bash
-# npm
-npm run build
+- pages/: Contains the application routes.
+- composables/: Contains the application composables.
+- server/: Contains the server-side code.
+- app.vue: The root component of the application.
+- app.config.ts: The application configuration.
 
-# pnpm
-pnpm build
+## TODO
+-  improve documentation
+-  making it easy to self host
+-  adding some automated tests
+-  refactoring the components
+-  checking usernames in chatroom, setting max users, validating server data.
+-  better layout for regular calls with more people
+-  UI refinements
+-  quick call link
 
-# yarn
-yarn build
+## future improvements
+- adding some local AI features
+	- backgrounds
+	- filters
+	- noise reduction
+- adding more fun stuff
+	- reactions
+	- raising hand
+	- soundboard
+	- GIFs
+	- letting people share richer chat text
 
-# bun
-bun run build
-```
+## Contributing
+Contributions are welcome! Please open an issue or submit a pull request.
 
-Locally preview production build:
+## License
+Litsi Chat is licensed under the MIT License.
 
-```bash
-# npm
-npm run preview
+## Acknowledgements
+This project uses the following dependencies:
 
-# pnpm
-pnpm preview
+- [Nuxt.js]()
+- [Simple Peer]()
+- [Vue.js]()
 
-# yarn
-yarn preview
 
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+## Author
+[Nirjan Khadka]()
