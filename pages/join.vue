@@ -1,6 +1,10 @@
 <template>
   <div class="flex px-4 flex-col gap-4 h-screen items-center justify-center">
-    <h1 class="text-xl md:text-2xl">Joining room with ID: {{ roomID }}</h1>
+    <h1 class="text-xl md:text-2xl flex items-center gap-2">
+      Joining chat room on litsi
+
+      <img src="/assets/images/logo.svg" class="w-10" alt="" />
+    </h1>
     <form action="" class="flex flex-col gap-2">
       <label for="username"
         >Enter your display name

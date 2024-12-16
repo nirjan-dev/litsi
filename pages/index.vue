@@ -1,6 +1,24 @@
 <template>
   <div class="flex items-center flex-col justify-center h-screen px-6">
-    <h1 class="text-2xl md:text-4xl py-4">Welcome to Litsi chat</h1>
+    <h1 class="text-2xl flex items-center gap-2 md:text-4xl py-4">
+      Welcome to Litsi
+
+      <img src="/assets/images/logo.svg" class="w-10" alt="" />
+    </h1>
+    <p class="text-sm md:text-default mb-4 max-w-[45ch]">
+      Instant, private video chats. No sign-up, no hassle. Just pure,
+      peer-to-peer connection, nothing is stored on the server. Create rooms,
+      invite friends, and chat instantly.
+    </p>
+    <p class="text-xs mb-6">
+      Made with ❤️ by
+      <a
+        href="https://nirjan.dev"
+        target="_blank"
+        class="underline text-blue-500"
+        >Nirjan</a
+      >
+    </p>
     <div class="flex flex-col gap-6 text-center">
       <UButton block @click="joinRoom"> Create new room </UButton>
 
