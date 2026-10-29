@@ -1,0 +1,15 @@
+{
+  "name": "litsi-docs",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@9.11.0",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "1.6.4"
+  }
+}

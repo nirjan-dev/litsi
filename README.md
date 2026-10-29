@@ -1,91 +1,126 @@
-# Litsi Chat
+# Litsi
 
-Litsi Chat is a real-time video chat application built with Nuxt.js. It allows users to create and join rooms, and engage in private and instant video chats. The application is designed to be simple, secure, and easy to use.
+Small, account-free video calls. Create a room, check your camera and microphone, and share a link.
 
-## Features
+[Try the prototype](https://litsi.fly.dev/) · [Documentation](https://litsi.nirjan.dev/) · [Self-hosting guide](docs-site/self-hosting.md) · [Architecture](docs-site/architecture.md)
 
-- Instant and private video chats
-- No sign-up or hassle
-- Pure peer-to-peer connection, nothing is stored on the server
-- Create rooms, invite friends, and chat instantly
+![A three-person Litsi room with cameras off and room chat](docs-site/public/images/litsi-call.webp)
 
-## Getting Started
+## What it does
 
-To get started, clone the repository and install the dependencies:
+- Create and join rooms without an account.
+- Preview devices before joining; camera and microphone start off. Joining with both off is supported.
+- Small-group WebRTC calls, screen sharing, and room chat.
+- Responsive call controls with explicit device, connection, and permission states.
+- Self-host the application as one Node process, with optional analytics disabled by default.
 
-```bash
-# pnpm or npm
-pnpm install
-```
+This is a deliberately bounded realtime-networking prototype, not a managed conferencing service. It has no recording, verified identities, moderation roles, automatic reconnect, or multi-instance coordination.
 
-create a .env file by copying the example env file
+## Run locally
 
-```bash
+Use Node.js 22 and pnpm 9.11.0:
+
+```sh
+pnpm install --frozen-lockfile
 cp .env.example .env
 ```
 
-- You need to use [Cloudflare Turn](https://developers.cloudflare.com/calls/turn/generate-credentials/) to make the WebRTC connection work for clients on a different network.
+Set `NUXT_TURN_ID` and `NUXT_TURN_TOKEN` using [Cloudflare TURN credentials](https://developers.cloudflare.com/realtime/turn/generate-credentials/), then start:
 
-Then, start the development server:
-
-```bash
-pnpm run dev
+```sh
+pnpm dev
 ```
 
-The application will be running at http://localhost:3000.
+Open `http://localhost:3000`. Device permissions require a secure context: localhost works, but an HTTP LAN IP does not. Use HTTPS for remote access.
 
-## Room sessions and TURN credentials
+You can explore the entry/preview screens without TURN configuration, but peer setup needs the ICE endpoint. It returns 503 when TURN is unconfigured; direct networking is not a guaranteed no-credentials mode. The current provider integration is Cloudflare-specific.
 
-- The server admits a WebSocket session for `/rooms/<roomID>` and sends that browser an opaque one-hour capability.
-- `/api/getIceUrls` is POST-only: it requires `Authorization: Bearer <capability>` and body `{ "roomID": "<roomID>" }`.
-- Each live session reuses its credentials across peers until 60 seconds before expiry. Requests are limited to 12 per minute. Provider issuance is limited to 60 attempts per hour and at most one attempt per session every 30 seconds.
-- Session and provider state are in memory, so deploy exactly one Node process and one Fly machine. Set the machine count with `fly scale count 1` before deployment; the GitHub Action does not manage scaling. `fly.toml` disables autostop and keeps the machine running.
-- Calls longer than one hour are outside this prototype's supported session: admission must be repeated.
+`NUXT_PUBLIC_TELEMETRYDECK_APP_ID` is optional. Leave it empty to send no analytics. If configured, Litsi sends app/call usage event names without display names, room IDs, or chat payloads. `NUXT_PUBLIC_DOCS_URL` changes the app's documentation links.
 
-## Project Structure
-The project is structured as follows:
+## Self-host
 
-- pages/: Contains the application routes.
-- composables/: Contains the application composables.
-- server/: Contains the server-side code.
-- app.vue: The root component of the application.
-- app.config.ts: The application configuration.
+The recommended public setup builds this repository and runs one application container behind Caddy HTTPS. TURN secrets are provided at runtime, never as image build arguments.
 
-## TODO
--  improve documentation
--  making it easy to self host
--  adding some automated tests
--  refactoring the components
--  checking usernames in chatroom, setting max users, validating server data.
--  better layout for regular calls with more people
--  UI refinements
--  quick call link
+```sh
+mkdir -p "$HOME/.config/litsi"
+cp deploy/.env.example "$HOME/.config/litsi/deploy.env"
+# Edit that file: set LITSI_DOMAIN, NUXT_TURN_ID, and NUXT_TURN_TOKEN.
+docker compose --env-file "$HOME/.config/litsi/deploy.env" \
+  -f deploy/compose.yaml up -d --build
+```
 
-## future improvements
-- adding some local AI features
-	- backgrounds
-	- filters
-	- noise reduction
-- adding more fun stuff
-	- reactions
-	- raising hand
-	- soundboard
-	- GIFs
-	- letting people share richer chat text
+Point your domain at the host and allow ports 80/443 before starting. The Node port is not published. Caddy handles TLS and WebSocket upgrades. See the [full guide](docs-site/self-hosting.md) for prerequisites, upgrades, Fly.io, and documentation publication.
 
-## Contributing
-Contributions are welcome! Please open an issue or submit a pull request.
+For a direct Node deployment behind an HTTPS reverse proxy:
 
-## License
-Litsi Chat is licensed under the MIT License.
+```sh
+pnpm build
+HOST=127.0.0.1 PORT=3000 node --env-file=.env .output/server/index.mjs
+```
 
-## Acknowledgements
-This project uses the following dependencies:
+The application needs a long-lived Node server. `pnpm generate`, static hosting, serverless adapters, clustered workers, and multiple replicas do not preserve its in-memory room model. The documentation site is static; the call app is not.
 
-- [Nuxt.js](https://nuxt.com/)
-- [Simple Peer](https://github.com/feross/simple-peer)
-- [Vue.js](https://vuejs.org/)
+## Networking and trust boundaries
 
+- **Signalling and chat:** browsers connect to the same origin's `/_ws` route. The server holds membership and forwards negotiation messages and chat. Display names must be unique within a live room; duplicate admissions are rejected rather than replacing someone.
+- **Media:** simple-peer establishes a WebRTC mesh. Camera, microphone, and screen media travel directly between browsers or through Cloudflare TURN when a relay is needed, not through the Nuxt server.
+- **Access:** possession of a room link permits joining. Names are unverified; there is no account, password, or host approval system. Share invitations privately.
+- **Storage:** the app persists no media or chat history. Rooms, admission capabilities, and credential caches live in memory; chat lives in browser tabs. Hosting/proxy logs and third-party processing are separate boundaries, not a “nothing is stored anywhere” promise.
+- **Restart:** deploying/restarting clears live room state and disconnects clients. There is no automatic room recovery.
 
-## Author
-[Nirjan Khadka](https://github.com/nirjan-dev/)
+### TURN admission and budgets
+
+An admitted WebSocket receives an opaque one-hour capability. `POST /api/getIceUrls` requires its bearer token and JSON `{ "roomID": "…" }`. A disconnect revokes that capability.
+
+Each browser session reuses/coalesces its credentials across peers until 60 seconds before their expiry. Limits are 12 endpoint requests per minute per session, a 30-second provider-attempt cooldown per session, and 60 provider attempts per hour for the whole process. Responses are `no-store`; credentials request a one-hour TTL. These controls bound issuance, not all possible abuse or provider cost.
+
+Run **exactly one Node process and one machine**. For Fly, run `fly scale count 1`; the workflow does not manage scaling. `fly.toml` disables autostop. Sessions do not renew automatically; after one hour, rejoin before connecting new participants. Longer calls are outside the supported prototype envelope.
+
+Read [privacy and limits](docs-site/privacy-and-limits.md) and [troubleshooting](docs-site/troubleshooting.md) before operating a public instance.
+
+## Verification
+
+```sh
+pnpm test        # Production build, then Node regression scenarios
+pnpm test:built  # Reuse an existing production build
+```
+
+The black-box scenarios run the real Nitro server with a loopback synthetic TURN provider. They cover capability protection and budgets, duplicate-name admission, room isolation, membership/media-state transitions, and transport closure/readmission. Pure peer-registry scenarios cover signals arriving before ICE setup and stale asynchronous peers. They do not contact Cloudflare or prove cross-network TURN connectivity.
+
+For an isolated manual browser check after building:
+
+```sh
+node test/fixture.mjs
+```
+
+Open the printed loopback URL. The fixture uses synthetic ICE responses; it is not a real TURN relay. Use distinct display names and generated media, not private calls. The docs screenshots use synthetic names/messages with cameras off. Local browser verification also exercised two- and three-peer media, receive-only joining, adding devices during a call, screen sharing/teardown, chat, denied permissions, and leave/readmission. This is local proof, not a production scale or cross-network reliability claim.
+
+## Documentation development
+
+The VitePress site is independent of the app and its secrets:
+
+```sh
+cd docs-site
+pnpm install --frozen-lockfile
+pnpm dev
+pnpm build
+```
+
+`.github/workflows/docs.yml` publishes it through GitHub Pages on `master` at [litsi.nirjan.dev](https://litsi.nirjan.dev/); **GitHub Actions** is the Pages source and the custom domain is configured in the repository's Pages settings. The build defaults to a root base for that domain; set the `DOCS_BASE` repository Actions variable to `/litsi/` only for the `nirjan-dev.github.io/litsi/` project site. Documentation-only changes do not redeploy the Fly app. See [publication instructions](docs-site/self-hosting.md#publish-the-documentation).
+
+## Project layout
+
+- `pages/` — landing, pre-call setup, and conversation UI.
+- `composables/useCallMedia.ts` — local device acquisition and cleanup.
+- `composables/useRoomCall.js`, `utils/peerRegistry.mjs` — client negotiation and peer lifecycle.
+- `server/routes/_ws.ts` — room admission, membership, signalling, chat, and media state.
+- `server/utils/turnSessions.ts`, `server/api/getIceUrls.ts` — capability-bound TURN issuance.
+- `test/` — isolated runtime fixtures and regression checks.
+- `deploy/` — single-instance Compose/Caddy deployment.
+- `docs-site/` — static project and operator documentation.
+
+## Licence and credits
+
+[MIT](LICENSE) · [Nirjan Khadka](https://nirjan.dev/)
+
+Built with [Nuxt](https://nuxt.com/), [Vue](https://vuejs.org/), [Nuxt UI](https://ui.nuxt.com/), and [simple-peer](https://github.com/feross/simple-peer). TURN connectivity uses [Cloudflare Realtime TURN](https://developers.cloudflare.com/realtime/turn/). The entry flow takes inspiration from [Orange Meets](https://demo.orange.cloudflare.dev/); Litsi retains its own interface and peer-to-peer mesh implementation.
