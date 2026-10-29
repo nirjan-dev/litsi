@@ -34,6 +34,14 @@ pnpm run dev
 
 The application will be running at http://localhost:3000.
 
+## Room sessions and TURN credentials
+
+- The server admits a WebSocket session for `/rooms/<roomID>` and sends that browser an opaque one-hour capability.
+- `/api/getIceUrls` is POST-only: it requires `Authorization: Bearer <capability>` and body `{ "roomID": "<roomID>" }`.
+- Each live session reuses its credentials across peers until 60 seconds before expiry. Requests are limited to 12 per minute. Provider issuance is limited to 60 attempts per hour and at most one attempt per session every 30 seconds.
+- Session and provider state are in memory, so deploy exactly one Node process and one Fly machine. Set the machine count with `fly scale count 1` before deployment; the GitHub Action does not manage scaling. `fly.toml` disables autostop and keeps the machine running.
+- Calls longer than one hour are outside this prototype's supported session: admission must be repeated.
+
 ## Project Structure
 The project is structured as follows:
 

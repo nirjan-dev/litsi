@@ -1,3 +1,5 @@
+import { admitTurnSession, revokeTurnSession } from "../utils/turnSessions";
+
 type Peer = Parameters<
   NonNullable<Parameters<typeof defineWebSocketHandler>[0]["open"]>
 >[0] & { username?: string; roomID?: string };
@@ -32,37 +34,43 @@ function sendUpdateChatUsersEvent(meetingRoom: MeetingRoom, peer: Peer) {
   });
 }
 
+function removePeer(peer: Peer) {
+  const roomID = peer.roomID;
+  const username = peer.username;
+  revokeTurnSession(peer);
+  if (typeof roomID !== "string" || !roomID || typeof username !== "string" || !username) return;
+  const meetingRoom = rooms.get(roomID);
+  if (!meetingRoom) return;
+  if (meetingRoom.get(username) === peer) meetingRoom.delete(username);
+}
+
 export default defineWebSocketHandler({
   open(peer) {
     const url = new URL(peer.request?.url || "");
     const username = url.searchParams.get("username") ?? "anonymous";
     const room = url.searchParams.get("roomID");
-    if (!room) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: "Room is required",
-      });
-    }
-    // TODO: add validation for existing username and don't allow empty usernames
+    const session = admitTurnSession(peer, room);
+    const admittedRoom = room as string;
 
     let meetingRoom: MeetingRoom;
-    if (!rooms.has(room)) {
-      meetingRoom = rooms.set(room, new Map()).get(room)!;
-      console.log(`created new meeting room: ${room}`);
+    if (!rooms.has(admittedRoom)) {
+      meetingRoom = rooms.set(admittedRoom, new Map()).get(admittedRoom)!;
+      console.log(`created new meeting room: ${admittedRoom}`);
     } else {
-      meetingRoom = rooms.get(room)!;
-      console.log(`joined existing meeting room: ${room}`);
+      meetingRoom = rooms.get(admittedRoom)!;
+      console.log(`joined existing meeting room: ${admittedRoom}`);
     }
 
     (peer as Peer).username = username;
-    (peer as Peer).roomID = room;
+    (peer as Peer).roomID = admittedRoom;
     console.log("WebSocket connected for user: ", username);
-    peer.subscribe(room);
+    peer.send({ type: "sessionAdmitted", payload: session });
+    peer.subscribe(admittedRoom);
     meetingRoom?.set(username, peer);
 
     sendUpdateChatUsersEvent(meetingRoom, peer);
 
-    peer.publish(room, {
+    peer.publish(admittedRoom, {
       type: "newCallerJoined",
       payload: {
         username,
@@ -134,11 +142,18 @@ export default defineWebSocketHandler({
     }
   },
   close(peer) {
-    const meetingRoom = rooms.get((peer as Peer).roomID ?? "")!;
-    meetingRoom.delete((peer as Peer).username!);
-
-    sendUpdateChatUsersEvent(meetingRoom, peer);
-
-    console.log("WebSocket closed for user: ", (peer as any).username);
+    const roomID = (peer as Peer).roomID ?? "";
+    const meetingRoom = rooms.get(roomID);
+    removePeer(peer as Peer);
+    if (meetingRoom) {
+      try {
+        sendUpdateChatUsersEvent(meetingRoom, peer as Peer);
+      } catch {
+      }
+    }
+    console.log("WebSocket closed for user: ", (peer as Peer).username);
+  },
+  error(peer) {
+    removePeer(peer as Peer);
   },
 });

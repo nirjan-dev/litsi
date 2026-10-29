@@ -1,6 +1,9 @@
 <template>
   <div class="h-screen flex flex-col justify-between pb-20">
     <main class="min-h-svh">
+      <p v-if="connectionError" role="alert" class="p-4 text-red-400">
+        {{ connectionError }}
+      </p>
       <section
         class="video-section"
         :class="controls.isChatOpen ? 'md:w-3/4' : ''"
@@ -140,6 +143,10 @@
 <script setup>
 import SimplePeer from "simple-peer/simplepeer.min.js";
 let ws;
+let turnSession;
+let turnCredentials;
+let turnRequest;
+const connectionError = ref("");
 
 let streamTracker = null;
 let streamsToTrack = [];
@@ -301,25 +308,38 @@ const log = (user, hashedEmail, ...args) => {
 
 const connect = async () => {
   const isSecure = location.protocol === "https:";
-  const url =
-    (isSecure ? "wss://" : "ws://") +
-    location.host +
-    "/_ws" +
-    `?username=${store.username}&roomID=${roomID}`;
+  const url = new URL("/_ws", location.origin);
+  url.protocol = isSecure ? "wss:" : "ws:";
+  url.searchParams.set("username", store.username);
+  url.searchParams.set("roomID", roomID);
   if (ws) {
     ws.close();
   }
 
-  ws = new WebSocket(url);
+  turnSession = null;
+  turnCredentials = null;
+  turnRequest = null;
+  connectionError.value = "";
+  const socket = new WebSocket(url);
+  ws = socket;
+  socket.addEventListener("close", () => {
+    if (ws !== socket) return;
+    turnSession = null;
+    turnCredentials = null;
+    turnRequest = null;
+  });
 
-  ws.addEventListener("message", async (event) => {
-    let data =
-      typeof event.data === "string"
-        ? event.data
-        : await event.data.text().then((text) => JSON.parse(text));
-    // console.log(data);
+  socket.addEventListener("message", async (event) => {
+    if (ws !== socket) return;
+    try {
+      const data = JSON.parse(
+        typeof event.data === "string" ? event.data : await event.data.text()
+      );
 
-    switch (data.type) {
+      switch (data.type) {
+      case "sessionAdmitted":
+        turnSession = data.payload;
+        return;
       case "newCallerJoined":
         await addPeer(data.payload.username, false);
         ws.send(
@@ -340,19 +360,51 @@ const connect = async () => {
       case "usersListUpdate":
         store.usersList = data.payload.usersList;
         return;
-
       default:
         break;
+      }
+    } catch (error) {
+      connectionError.value =
+        error.statusCode === 429 || error.status === 429
+          ? "Connection setup is temporarily limited. Wait before rejoining."
+          : "Could not set up the call. Please leave and rejoin the room.";
     }
   });
 };
+
+async function getIceCredentials() {
+  const session = turnSession;
+  if (!session || session.expiresAt <= Date.now()) {
+    throw new Error("Room session expired");
+  }
+  if (turnCredentials && turnCredentials.expiresAt > Date.now() + 60_000) {
+    return turnCredentials;
+  }
+  if (!turnRequest) {
+    turnRequest = $fetch("/api/getIceUrls", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.capability}` },
+      body: { roomID },
+      retry: 0,
+    })
+      .then((credentials) => {
+        if (turnSession !== session) throw new Error("Room session closed");
+        turnCredentials = credentials;
+        return credentials;
+      })
+      .finally(() => {
+        if (turnSession === session) turnRequest = null;
+      });
+  }
+  return turnRequest;
+}
 
 async function addPeer(username, isInitiator) {
   if (!username) {
     return;
   }
 
-  const { iceServers } = await $fetch(`/api/getIceUrls`);
+  const { iceServers } = await getIceCredentials();
 
   if (!iceServers) {
     return;
@@ -368,7 +420,7 @@ async function addPeer(username, isInitiator) {
     initiator: isInitiator,
     streams,
     config: {
-      iceServers: [iceServers],
+      iceServers,
     },
   });
 
@@ -491,6 +543,10 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  ws?.close();
+  turnSession = null;
+  turnCredentials = null;
+  turnRequest = null;
   if (streamTracker) {
     clearInterval(streamTracker);
     streamTracker = null;

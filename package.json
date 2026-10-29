@@ -6,7 +6,9 @@
     "dev": "nuxt dev --host",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "test": "nuxt build && node --test test/*.test.mjs",
+    "test:built": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@nuxt/ui": "2.20.0",
