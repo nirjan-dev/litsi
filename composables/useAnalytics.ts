@@ -3,40 +3,18 @@ import TelemetryDeck from "@telemetrydeck/sdk";
 let analytics: TelemetryDeck | null = null;
 
 export const useAnalytics = () => {
-  const appID = useRuntimeConfig().public.telemetrydeck.appID;
+  const appID = useRuntimeConfig().public.telemetrydeck.appID.trim();
 
-  if (!analytics) {
-    console.log("TelemetryDeck initialized");
-    analytics = new TelemetryDeck({
+  function trackEvent(event: string) {
+    if (import.meta.server || !appID) return;
+    analytics ??= new TelemetryDeck({
       appID,
-      clientUser: "default",
+      clientUser: "anonymous",
       testMode: import.meta.dev,
     });
+    // Opt-in analytics must not interrupt a conversation when unavailable.
+    void analytics.signal(event).catch(() => {});
   }
 
-  function trackEvent(
-    event: string,
-    payload?: {
-      [key: string]: string;
-    }
-  ) {
-    if (!analytics) {
-      return;
-    }
-    console.log("tracking event", event, payload);
-    analytics.signal(event, payload);
-  }
-
-  function setUserID(userId: string) {
-    if (!analytics) {
-      return;
-    }
-    console.log("setting user id", userId);
-    analytics.clientUser = userId;
-  }
-
-  return {
-    trackEvent,
-    setUserID,
-  };
+  return { trackEvent };
 };

@@ -5,6 +5,12 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - 'docs-site/**'
+      - 'deploy/**'
+      - '**/*.md'
+      - 'LICENSE'
+      - '.github/workflows/docs.yml'
 jobs:
   deploy:
     name: Deploy app
