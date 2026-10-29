@@ -13,11 +13,14 @@ export default defineNuxtConfig({
     turnID: "",
     turnToken: "",
     public: {
+      docsUrl: "https://litsi.nirjan.dev/",
       telemetrydeck: {
         appID: "",
       },
     },
   },
+
+  css: ["~/assets/css/main.css"],
 
   modules: ["@nuxt/ui"],
 });

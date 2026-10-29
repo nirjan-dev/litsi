@@ -10,8 +10,8 @@ onMounted(() => {
   useAnalytics().trackEvent("APP.LOAD");
 });
 
-const title = `Litsi Chat - Instant, private video chats. No sign-up, no hassle.`;
-const description = `Instant, private video chats. No sign-up, no hassle. Just pure, peer-to-peer connection, nothing is stored on the server. Create rooms, invite friends, and chat instantly.`;
+const title = "Litsi — video calls, one simple link";
+const description = "Create a room, share a link, and talk. No account required. A self-hostable WebRTC video chat with screen sharing and room chat.";
 const image = "/assets/images/og.png";
 
 useSeoMeta({
