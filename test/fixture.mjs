@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { access } from 'node:fs/promises';
-import { createServer } from 'node:http';
+import { createServer, request } from 'node:http';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
@@ -77,6 +77,7 @@ export async function startFixture(options) {
   let child = null;
   let stopped = false;
   const sockets = new Set();
+  const rawSockets = new Set();
   let logs = '';
 
   async function close() {
@@ -84,6 +85,7 @@ export async function startFixture(options) {
       return;
     }
     stopped = true;
+    for (const socket of rawSockets) socket.destroy();
     for (const ws of sockets) {
       try {
         ws.close();
@@ -180,13 +182,15 @@ export async function startFixture(options) {
       });
     }
 
-    async function connect(roomID, username) {
+    async function connect(roomID, username, options = {}) {
       const started = Date.now() + clockOffset;
       const ws = new WebSocket(url.replace('http:', 'ws:') + '/_ws?' + new URLSearchParams({ roomID, username }));
       sockets.add(ws);
       const messages = [];
       const waiters = new Set();
       ws.binaryType = 'arraybuffer';
+      const closed = new Promise((resolve) => ws.addEventListener('close', resolve, { once: true }));
+      if (options.onOpen) ws.addEventListener('open', () => options.onOpen(ws), { once: true });
       let decode = Promise.resolve();
       ws.addEventListener('message', (event) => {
         decode = decode.catch(() => {}).then(async () => {
@@ -236,13 +240,16 @@ export async function startFixture(options) {
           check();
         });
       }
-      const admitted = await waitFor((message) => message.type === 'sessionAdmitted');
-      assert.equal(messages[0].type, 'sessionAdmitted', 'capability must precede presence events');
-      assert.equal(typeof admitted.payload.capability, 'string');
-      assert.ok(admitted.payload.capability.length >= 43, '32 bytes of opaque randomness');
-      assert.equal(typeof admitted.payload.expiresAt, 'number');
-      assert.ok(admitted.payload.expiresAt >= started + 3590000);
-      assert.ok(admitted.payload.expiresAt <= Date.now() + clockOffset + 3601000);
+      let admitted;
+      if (options.admit !== false) {
+        admitted = await waitFor((message) => message.type === 'sessionAdmitted');
+        assert.equal(messages[0].type, 'sessionAdmitted', 'capability must precede presence events');
+        assert.equal(typeof admitted.payload.capability, 'string');
+        assert.ok(admitted.payload.capability.length >= 43, '32 bytes of opaque randomness');
+        assert.equal(typeof admitted.payload.expiresAt, 'number');
+        assert.ok(admitted.payload.expiresAt >= started + 3590000);
+        assert.ok(admitted.payload.expiresAt <= Date.now() + clockOffset + 3601000);
+      }
       async function disconnect() {
         if (ws.readyState === WebSocket.CLOSED) {
           return;
@@ -252,7 +259,35 @@ export async function startFixture(options) {
         await done;
         sockets.delete(ws);
       }
-      return { ws, messages, waitFor, disconnect, roomID, capability: admitted.payload.capability, expiresAt: admitted.payload.expiresAt };
+      return { ws, messages, waitFor, disconnect, roomID, closed, drained: () => decode, capability: admitted?.payload.capability, expiresAt: admitted?.payload.expiresAt };
+    }
+
+    // A real upgraded transport can send invalid frames to exercise the adapter's
+    // error hook, followed by its eventual close hook, without a debug endpoint.
+    function connectTransport(roomID, username) {
+      return new Promise((resolve, reject) => {
+        const req = request(url + '/_ws?' + new URLSearchParams({ roomID, username }), {
+          headers: {
+            Connection: 'Upgrade',
+            Upgrade: 'websocket',
+            'Sec-WebSocket-Version': '13',
+            'Sec-WebSocket-Key': Buffer.alloc(16, 7).toString('base64'),
+          },
+        });
+        req.on('error', reject);
+        req.on('response', (response) => {
+          response.resume();
+          reject(new Error('Expected WebSocket upgrade, got ' + response.statusCode));
+        });
+        req.on('upgrade', (_response, socket) => {
+          rawSockets.add(socket);
+          socket.on('error', () => {});
+          socket.on('close', () => rawSockets.delete(socket));
+          socket.resume();
+          resolve(socket);
+        });
+        req.end();
+      });
     }
 
     function issue(session, overrides) {
@@ -299,7 +334,7 @@ export async function startFixture(options) {
       return Date.now() + clockOffset;
     }
 
-    return { url, attempts, connect, issue, advance, close, waitForAttempts, setMode, release, now };
+    return { url, attempts, connect, connectTransport, issue, advance, close, waitForAttempts, setMode, release, now };
   } catch (error) {
     await close();
     throw error;
